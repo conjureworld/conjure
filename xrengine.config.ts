@@ -4,7 +4,7 @@ const config: ProjectConfigInterface = {
   onEvent: undefined,
   thumbnail: '/static/xrengine_thumbnail.jpg',
   routes: {},
-  services: undefined,
+  services: './src/services/services.ts',
   databaseSeed: undefined
 }
 

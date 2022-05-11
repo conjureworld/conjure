@@ -4,10 +4,11 @@
   "description": "",
   "main": "",
   "scripts": {
-    "test": "mocha --config .mocharc.js"
   },
   "peerDependencies": {},
-  "dependencies": {},
+  "dependencies": {
+    "three-forcegraph": "1.39.4"
+  },
   "devDependencies": {
     "mocha": "9.2.2",
     "trace-unhandled": "2.0.1"
