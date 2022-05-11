@@ -1,7 +1,5 @@
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
-import { EngineActions } from '@xrengine/engine/src/ecs/classes/EngineService'
 import { World } from '@xrengine/engine/src/ecs/classes/World'
-import { matchActionOnce } from '@xrengine/engine/src/networking/functions/matchActionOnce'
 import InfiniteGridHelper from '@xrengine/engine/src/scene/classes/InfiniteGridHelper'
 import { ObjectLayers } from '@xrengine/engine/src/scene/constants/ObjectLayers'
 import { Color } from 'three'
@@ -76,17 +74,14 @@ const myData = {
 
 export default async function GraphSystem(world: World) {
 
-  matchActionOnce(Engine.instance.store, EngineActions.sceneLoaded.matches, () => {
-    const grid = new InfiniteGridHelper(1, 10, new Color(0.2, 0.2, 0.2))
-    grid.layers.set(ObjectLayers.Scene)
-    Engine.instance.scene.add(grid)
-  })
+  const grid = new InfiniteGridHelper(1, 10, new Color(0.2, 0.2, 0.2))
+  grid.layers.set(ObjectLayers.Scene)
+  Engine.instance.scene.add(grid)
 
   const myGraph = new ThreeForceGraph().graphData(myData)
   myGraph.scale.multiplyScalar(0.025)
   myGraph.position.setY(1)
   Engine.instance.scene.add(myGraph)
-
 
   return () => {
     myGraph.tickFrame()
