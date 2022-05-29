@@ -7,6 +7,8 @@
   },
   "peerDependencies": {},
   "dependencies": {
+    "@types/google-spreadsheet": "3.2.2",
+    "google-spreadsheet": "3.3.0",
     "three-forcegraph": "1.39.4"
   },
   "devDependencies": {
