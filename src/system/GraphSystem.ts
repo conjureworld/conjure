@@ -1,3 +1,4 @@
+import { client } from '@xrengine/client-core/src/feathers'
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
 import { World } from '@xrengine/engine/src/ecs/classes/World'
 import InfiniteGridHelper from '@xrengine/engine/src/scene/classes/InfiniteGridHelper'
@@ -5,6 +6,8 @@ import { ObjectLayers } from '@xrengine/engine/src/scene/constants/ObjectLayers'
 import { Color } from 'three'
 
 import ThreeForceGraph from 'three-forcegraph'
+import { GoogleSpreadsheetService } from '../client/GoogleSpreadsheetService'
+import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
 
 const myData = {
   "nodes": [
@@ -71,17 +74,39 @@ const myData = {
   ]
 }
 
+const spreadsheetId = `1_fLq16ezrnOpYGynawDVWezrFuj2bomEfnssmqA03m8`
+const sheetId = 0
 
 export default async function GraphSystem(world: World) {
+  // todo: move to receptor pattern
+  // console.log(await GoogleSpreadsheetService.getGoogleSpreadsheet(spreadsheetId, sheetId))
+
+  const googlespreadsheets = await client.service('conjure-google-spreadsheet').get({
+    spreadsheetId, sheetId
+  })
+
+  console.log(googlespreadsheets)
+
+  const daoMapData = {
+    nodes: googlespreadsheets.map((rowData, rowIndex) => {
+      return {
+        id: rowIndex,
+        name: rowData.Name,
+        val: 1//rowData.Website
+      }
+    }),
+    links: []
+  }
 
   const grid = new InfiniteGridHelper(1, 10, new Color(0.2, 0.2, 0.2))
   grid.layers.set(ObjectLayers.Scene)
-  Engine.instance.scene.add(grid)
+  Engine.instance.currentWorld.scene.add(grid)
 
-  const myGraph = new ThreeForceGraph().graphData(myData)
+  const myGraph = new ThreeForceGraph().graphData(daoMapData)
   myGraph.scale.multiplyScalar(0.025)
   myGraph.position.setY(1)
-  Engine.instance.scene.add(myGraph)
+  Engine.instance.currentWorld.scene.add(myGraph)
+  console.log(myGraph)
 
   return () => {
     myGraph.tickFrame()

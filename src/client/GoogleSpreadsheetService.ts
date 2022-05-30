@@ -42,7 +42,7 @@ export const useGoogleSpreadsheetState = () => useState(accessGoogleSpreadsheetS
 
 //Service
 export const GoogleSpreadsheetService = {
-  getGoogleSpreadsheet: async (spreadsheetId: string, sheetId: string) => {
+  getGoogleSpreadsheet: async (spreadsheetId: string, sheetId: number) => {
     const googlespreadsheets = await client.service('conjure-google-spreadsheet').get({
       spreadsheetId, sheetId
     })
@@ -54,8 +54,8 @@ export class GoogleSpreadsheetAction {
   static googleSpreadsheetQueryAction = defineAction({
     store: 'ENGINE',
     type: 'GoogleSpreadsheet.GOOGLESPREADSHEETS_RETRIEVED',
-    sheetId: matches.string,
+    sheetId: matches.number,
     spreadsheetId: matches.string,
-    data: matches.object as Validator<unknown, GoogleSpreadsheetWorksheet>
+    data: matches.object as Validator<unknown, any>
   })
 }
