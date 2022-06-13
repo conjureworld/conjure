@@ -48,7 +48,7 @@ export default async function GraphSystem(world: World) {
         val: 1,
         ...rowData
       }
-    }).slice(0, 1),
+    }),
     links: []
   }
 
