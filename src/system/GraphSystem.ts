@@ -1,13 +1,15 @@
 import { client } from '@xrengine/client-core/src/feathers'
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
 import { World } from '@xrengine/engine/src/ecs/classes/World'
+import { getComponent } from '@xrengine/engine/src/ecs/functions/ComponentFunctions'
 import InfiniteGridHelper from '@xrengine/engine/src/scene/classes/InfiniteGridHelper'
 import { ObjectLayers } from '@xrengine/engine/src/scene/constants/ObjectLayers'
-import { Color } from 'three'
+import { XRUIComponent } from '@xrengine/engine/src/xrui/components/XRUIComponent'
+import { XRUI } from '@xrengine/engine/src/xrui/functions/createXRUI'
+import { Color, Vector3, Object3D } from 'three'
 
 import ThreeForceGraph from 'three-forcegraph'
-import { GoogleSpreadsheetService } from '../client/GoogleSpreadsheetService'
-import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
+import { createSpreadsheetView as createSpreadsheetXRUI } from '../client/ui/GoogleSpreadsheetXRUI'
 
 const myData = {
   "nodes": [
@@ -15,62 +17,13 @@ const myData = {
       "id": "id1",
       "name": "name1",
       "val": 1
-    },
-    {
-      "id": "id2",
-      "name": "name2",
-      "val": 2
-    },
-    {
-      "id": "id3",
-      "name": "name3",
-      "val": 1
-    },
-    {
-      "id": "id4",
-      "name": "name4",
-      "val": 2
-    },
-    {
-      "id": "id5",
-      "name": "name5",
-      "val": 1
-    },
-    {
-      "id": "id6",
-      "name": "name6",
-      "val": 1.5
-    },
+    }
   ],
   "links": [
     {
       "source": "id1",
       "target": "id2"
-    },
-    {
-      "source": "id2",
-      "target": "id3"
-    },
-    {
-      "source": "id1",
-      "target": "id3"
-    },
-    {
-      "source": "id3",
-      "target": "id4"
-    },
-    {
-      "source": "id1",
-      "target": "id4"
-    },
-    {
-      "source": "id3",
-      "target": "id5"
-    },
-    {
-      "source": "id2",
-      "target": "id6"
-    },
+    }
   ]
 }
 
@@ -92,9 +45,10 @@ export default async function GraphSystem(world: World) {
       return {
         id: rowIndex,
         name: rowData.Name,
-        val: 1//rowData.Website
+        val: 1,
+        ...rowData
       }
-    }),
+    }).slice(0, 1),
     links: []
   }
 
@@ -106,9 +60,34 @@ export default async function GraphSystem(world: World) {
   myGraph.scale.multiplyScalar(0.025)
   myGraph.position.setY(1)
   Engine.instance.currentWorld.scene.add(myGraph)
-  console.log(myGraph)
+
+  const xruis = [] as { ui: ReturnType<typeof createSpreadsheetXRUI>, node: Object3D }[]
+
+  // forcegraph does stuff async internally with no callback......
+  setTimeout(() => {
+    myGraph.children.forEach((node: any) => {
+      if(node.__data.name)
+        xruis.push({ ui: createSpreadsheetXRUI(node.__data.name, node.__data.Website), node })
+    })
+  }, 100)
+
+  const vec3 = new Vector3()
+  const uiFalloffFactor = 2
 
   return () => {
+    for(const ui of xruis) {
+      const xrui = getComponent(ui.ui.entity, XRUIComponent)
+      if (!xrui) continue
+
+      ui.node.getWorldPosition(vec3)
+      
+      xrui.container.scale.setScalar(
+        Math.max(1, Engine.instance.currentWorld.camera.position.distanceTo(vec3) / (3 * uiFalloffFactor))
+      )
+      xrui.container.position.copy(vec3)
+      xrui.container.position.y += 0.25
+      xrui.container.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
+    }
     myGraph.tickFrame()
   }
 }
