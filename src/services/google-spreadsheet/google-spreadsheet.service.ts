@@ -50,18 +50,15 @@ const googleSpreadsheetQuery = (app: Application) => async (data: GoogleSpreadsh
   await sheet.loadCells()
 
   const result = [] as any
-  console.log(sheet.rowCount, sheet.columnCount)
 
-  for(let rowIndex = 0; rowIndex < sheet.rowCount; rowIndex++) {
+  for(let rowIndex = 1; rowIndex < sheet.rowCount; rowIndex++) {
     const row = {} as any
     for(let columnIndex = 0; columnIndex < sheet.columnCount; columnIndex++) {
-      console.log(rowIndex, columnIndex, sheet.getCell(rowIndex, columnIndex).value)
       row[String(sheet.getCell(0, columnIndex).value)] = sheet.getCell(rowIndex, columnIndex).value
     }
-    console.log(row)
     result.push(row)
   }
-  console.log(result)
+  // console.log(result)
 
   return result
 } 

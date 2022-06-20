@@ -21,19 +21,14 @@ const styles = {
   }
 }
 
-type SpreadsheetState = {
-  id: string,
-  website: string
+export function createSpreadsheetView(id: string, link: string) {
+  return createXRUI(GoogleSpreadsheetView, createNametagState(id, link))
 }
 
-export function createSpreadsheetView(id: string, website: string) {
-  return createXRUI(GoogleSpreadsheetView, createNametagState(id, website))
-}
-
-function createNametagState(id: string, website: string) {
+function createNametagState(id: string, link: string) {
   return createState({
     id,
-    website
+    link
   })
 }
 
@@ -50,7 +45,7 @@ const GoogleSpreadsheetView = () => {
       style={styles.spreadsheetName as {}} onPointerEnter={console.log} onPointerLeave={console.log}
     >
       {spreadsheetState.id.value}
-      {hover && <p xr-layer="true" style={{ padding: '0px' }}>{spreadsheetState.website.value}</p>}
+      {hover && <p xr-layer="true" style={{ padding: '0px' }}>{spreadsheetState.link.value}</p>}
     </div>
   </>
 }
