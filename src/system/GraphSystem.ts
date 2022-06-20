@@ -9,28 +9,18 @@ import { Object3DComponent } from '@xrengine/engine/src/scene/components/Object3
 import { ObjectLayers } from '@xrengine/engine/src/scene/constants/ObjectLayers'
 import { XRUIComponent } from '@xrengine/engine/src/xrui/components/XRUIComponent'
 import { XRUI } from '@xrengine/engine/src/xrui/functions/createXRUI'
-import { Color, Vector3, Object3D } from 'three'
+import { Color, Vector3, Object3D, Mesh, CircleGeometry, MeshBasicMaterial, MeshStandardMaterial, Texture, sRGBEncoding, DoubleSide } from 'three'
 
 import ThreeForceGraph from 'three-forcegraph'
 import { createCardView } from '../client/ui/CardXRUI'
 import { createSpreadsheetView as createSpreadsheetXRUI } from '../client/ui/GoogleSpreadsheetXRUI'
 import { ObjectFitFunctions } from '@xrengine/engine/src/xrui/functions/ObjectFitFunctions'
 import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
+import { AssetLoader } from '@xrengine/engine/src/assets/classes/AssetLoader'
 
-const myData = {
-  "nodes": [
-    {
-      "id": "id1",
-      "name": "name1",
-      "val": 1
-    }
-  ],
-  "links": [
-    {
-      "source": "id1",
-      "target": "id2"
-    }
-  ]
+type GraphData = {
+  nodes: Array<{ id: string, name: string, val: number }>
+  links: Array<{ source: string, target: string }>
 }
 
 const mapEmergeParticipants = (data) => {
@@ -58,13 +48,21 @@ const spreadsheets = {
   }
 }
 
+const nodeTypes = {
+  root: "root" as const,
+  category: "category" as const,
+  subcategory: "subcategory" as const,
+  person: "person" as const
+}
+
 const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
 
-  const treeNodes = [] as { id: string, name: string, val: number }[]
+  const treeNodes = [] as { id: string, name: string, val: number, type: typeof nodeTypes[keyof typeof nodeTypes] }[]
   treeNodes.push({
     "id": "root",
     "name": "",
-    "val": 1
+    "val": 1,
+    type: nodeTypes.root
   })
 
   const links = [] as { source: string, target: string }[]
@@ -82,7 +80,8 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
     treeNodes.push({
       "id": category,
       "name": category,
-      "val": 1
+      "val": 1,
+      type: nodeTypes.category
     })
     links.push({
       source: category,
@@ -96,7 +95,8 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
       treeNodes.push({
         "id": category + ' - ' + subcategory,
         "name": subcategory,
-        "val": 0.01
+        "val": 1,
+        type: nodeTypes.subcategory
       })
     })
   })
@@ -120,6 +120,7 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
         id: rowData.Name,
         name: rowData.Name,
         val: 1,
+        type: nodeTypes.person as string,
         ...rowData
       }
     }).concat(treeNodes),
@@ -129,6 +130,9 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
   return treeClusteringData
 }
 
+const scaleFactor = 0.025
+const invScaleFactor = 1 / scaleFactor
+
 /**
  * two presentation styles
  * - tree based clustering
@@ -136,6 +140,7 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
  * - basic category based relational graph
  *   - uses categories as weights
  */
+
 
 const activeSpreadsheet = 'emerge'
 
@@ -186,7 +191,7 @@ export default async function GraphSystem(world: World) {
   Engine.instance.currentWorld.scene.add(grid)
 
   const myGraph = new ThreeForceGraph().graphData(treeClusteringData)
-  myGraph.scale.multiplyScalar(0.025)
+  myGraph.scale.multiplyScalar(scaleFactor)
   myGraph.position.setY(1)
   Engine.instance.currentWorld.scene.add(myGraph)
 
@@ -194,12 +199,34 @@ export default async function GraphSystem(world: World) {
 
   // forcegraph does stuff async internally with no callback......
   setTimeout(() => {
-    myGraph.children.forEach((node: any) => {
-      if (node.material)
-        node.material.color = new Color('white')
-      if (node.__data.name)
-        xruis.push({ ui: createSpreadsheetXRUI(node.__data.name, node.__data[spreadsheet.linkColumnId]), node })
+    myGraph.children.forEach((node: Mesh<any, any>) => {
+      if (node.type === 'Mesh') {
+        const nodeData = (node as any).__data
+        console.log(nodeData)
+        if (nodeData.type === nodeTypes.person) node.material.visible = false
+        
+        const imgPath = `https://${location.host}/projects/conjure/emerge/${nodeData.name}.jpg`
+        AssetLoader.load(imgPath, ((texture) => {
+          texture.encoding = sRGBEncoding
+          const mesh = new Mesh(new CircleGeometry(0.25, 16), new MeshBasicMaterial({ color: new Color('white'), map: texture, side: DoubleSide }))
+          mesh.scale.setScalar(invScaleFactor)
+          node.add(mesh)
+          node.userData.img = mesh
+        }))
+
+        if (nodeData.name) {
+          const ui = createSpreadsheetXRUI(nodeData.name, nodeData[spreadsheet.linkColumnId])
+          xruis.push({ ui, node })
+          ui.container.then(() => {
+            const xrui = getComponent(ui.entity, XRUIComponent)
+            node.getWorldPosition(xrui.container.position)
+            xrui.container.position.y += 0.25
+          })
+        }
+      }
     })
+    // iterate the 
+    for (let i = 0; i < 60; i++) myGraph.tickFrame()
   }, 100)
 
   const vec3 = new Vector3()
@@ -224,20 +251,22 @@ export default async function GraphSystem(world: World) {
       const xrui = getComponent(ui.ui.entity, XRUIComponent)
       if (!xrui) continue
 
-
       ui.node.getWorldPosition(vec3)
-
       const distanceToCamera = Engine.instance.currentWorld.camera.position.distanceTo(vec3)
+      const visible = distanceToCamera < 10
+      xrui.container.visible = visible
+
+      if(!visible) continue
 
       xrui.container.scale.setScalar(
         Math.max(1, distanceToCamera / (3 * uiFalloffFactor))
       )
-      xrui.container.position.copy(vec3)
-      xrui.container.position.y += 0.25
       xrui.container.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
 
-      xrui.container.visible = distanceToCamera < 5
+      const img = ui.node.userData.img 
+      if(img) {
+        img.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
+      }
     }
-    myGraph.tickFrame()
   }
 }
