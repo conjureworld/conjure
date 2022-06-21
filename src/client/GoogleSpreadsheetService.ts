@@ -1,7 +1,7 @@
 import { matches, Validator } from '@xrengine/engine/src/common/functions/MatchesUtils'
 import { addActionReceptor, defineAction, defineState, dispatchAction, getState, registerState, useState } from '@xrengine/hyperflux'
 import type { GoogleSpreadsheetWorksheet } from 'google-spreadsheet'
-import { client } from '@xrengine/client-core/src/feathers'
+import { API } from '@xrengine/client-core/src/API'
 
 export const GOOGLESPREADSHEET_PAGE_LIMIT = 100
 
@@ -37,7 +37,7 @@ export const useGoogleSpreadsheetState = () => useState(accessGoogleSpreadsheetS
 //Service
 export const GoogleSpreadsheetService = {
   getGoogleSpreadsheet: async (spreadsheetId: string, sheetId: number) => {
-    const googlespreadsheets = await client.service('conjure-google-spreadsheet').get({
+    const googlespreadsheets = await API.instance.client.service('conjure-google-spreadsheet').get({
       spreadsheetId, sheetId
     })
     dispatchAction(GoogleSpreadsheetAction.googleSpreadsheetQueryAction({ sheetId, spreadsheetId, data: googlespreadsheets }))
