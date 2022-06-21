@@ -1,4 +1,3 @@
-import { client } from '@xrengine/client-core/src/feathers'
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
 import { World } from '@xrengine/engine/src/ecs/classes/World'
 import { getComponent } from '@xrengine/engine/src/ecs/functions/ComponentFunctions'
@@ -17,6 +16,7 @@ import { createSpreadsheetView as createSpreadsheetXRUI } from '../client/ui/Goo
 import { ObjectFitFunctions } from '@xrengine/engine/src/xrui/functions/ObjectFitFunctions'
 import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
 import { AssetLoader } from '@xrengine/engine/src/assets/classes/AssetLoader'
+import { API } from '@xrengine/client-core/src/API'
 
 type GraphData = {
   nodes: Array<{ id: string, name: string, val: number }>
@@ -153,7 +153,7 @@ export default async function GraphSystem(world: World) {
    */
   const spreadsheet = spreadsheets[activeSpreadsheet]
 
-  const rawData = await client.service('conjure-google-spreadsheet').get({
+  const rawData = await API.instance.client.service('conjure-google-spreadsheet').get({
     spreadsheetId: spreadsheet.spreadsheetId,
     sheetId: spreadsheet.sheetId
   })
