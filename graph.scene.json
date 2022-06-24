@@ -295,7 +295,7 @@
             "filePath": "__$project$__/conjure/src/system/GraphSystem.ts",
             "systemUpdateType": "FIXED",
             "enableClient": true,
-            "enableServer": true,
+            "enableServer": false,
             "args": ""
           }
         }

@@ -1,6 +1,6 @@
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
 import { World } from '@xrengine/engine/src/ecs/classes/World'
-import { getComponent } from '@xrengine/engine/src/ecs/functions/ComponentFunctions'
+import { getComponent, hasComponent } from '@xrengine/engine/src/ecs/functions/ComponentFunctions'
 import { matchActionOnce } from '@xrengine/engine/src/networking/functions/matchActionOnce'
 import { WorldNetworkAction } from '@xrengine/engine/src/networking/functions/WorldNetworkAction'
 import InfiniteGridHelper from '@xrengine/engine/src/scene/classes/InfiniteGridHelper'
@@ -17,6 +17,16 @@ import { ObjectFitFunctions } from '@xrengine/engine/src/xrui/functions/ObjectFi
 import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
 import { AssetLoader } from '@xrengine/engine/src/assets/classes/AssetLoader'
 import { API } from '@xrengine/client-core/src/API'
+import { addActionReceptor, createActionQueue } from '@xrengine/hyperflux'
+import { AvatarComponent } from '@xrengine/engine/src/avatar/components/AvatarComponent'
+import { switchCameraMode } from '@xrengine/engine/src/avatar/functions/switchCameraMode'
+import { CameraMode } from '@xrengine/engine/src/camera/types/CameraMode'
+import { FollowCameraComponent } from '@xrengine/engine/src/camera/components/FollowCameraComponent'
+import { setTargetCameraRotation } from '@xrengine/engine/src/avatar/AvatarInputSchema'
+import { InputComponent } from '@xrengine/engine/src/input/components/InputComponent'
+import { BaseInput } from '@xrengine/engine/src/input/enums/BaseInput'
+import { matches } from '@xrengine/engine/src/common/functions/MatchesUtils'
+import { EngineActions, EngineState, getEngineState } from '@xrengine/engine/src/ecs/classes/EngineState'
 
 type GraphData = {
   nodes: Array<{ id: string, name: string, val: number }>
@@ -48,7 +58,7 @@ const spreadsheets = {
   }
 }
 
-const nodeTypes = {
+export const nodeTypes = {
   root: "root" as const,
   category: "category" as const,
   subcategory: "subcategory" as const,
@@ -65,7 +75,7 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
     type: nodeTypes.root
   })
 
-  const links = [] as { source: string, target: string }[]
+  const links = [] as { source: string, target: string, val?: string }[]
 
   const categories = [] as string[]
   data.forEach((entry) => {
@@ -91,7 +101,7 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
     // TODO: remove any sub categories that have no people within them
 
     categories.forEach((subcategory) => {
-      if(subcategory === category) return
+      if (subcategory === category) return
       treeNodes.push({
         "id": category + ' - ' + subcategory,
         "name": subcategory,
@@ -142,9 +152,23 @@ const invScaleFactor = 1 / scaleFactor
  */
 
 
+const updateCameraSettings = () => {
+  const world = Engine.instance.currentWorld
+  console.log('avatar spawn')
+  const followComponent = getComponent(world.localClientEntity, FollowCameraComponent)
+  followComponent.distance = 0.01
+  followComponent.maxPhi = 45
+  followComponent.minPhi = -45
+  followComponent.zoomLevel = 0.01
+  // setTargetCameraRotation(world.localClientEntity, 0, followComponent.theta)
+  switchCameraMode(world.localClientEntity, { cameraMode: CameraMode.FirstPerson }, true)
+  getComponent(world.localClientEntity, InputComponent).schema.behaviorMap.delete(BaseInput.CAMERA_SCROLL)
+}
+
 const activeSpreadsheet = 'emerge'
 
 export default async function GraphSystem(world: World) {
+
   // todo: move to receptor pattern
   // console.log(await GoogleSpreadsheetService.getGoogleSpreadsheet(spreadsheetId, sheetId))
 
@@ -160,10 +184,10 @@ export default async function GraphSystem(world: World) {
 
   const data = spreadsheet.filter(rawData) as GoogleSpreadsheetData
 
-  console.log(data)
-  
+  // console.log(data)
+
   const treeClusteringData = getTreeClusteringData(data)
-  console.log(treeClusteringData)
+  // console.log(treeClusteringData)
 
   // const relationalClusteringData = {
   //   nodes: data.map((rowData, rowIndex) => {
@@ -190,7 +214,11 @@ export default async function GraphSystem(world: World) {
   grid.layers.set(ObjectLayers.Scene)
   Engine.instance.currentWorld.scene.add(grid)
 
-  const myGraph = new ThreeForceGraph().graphData(treeClusteringData)
+  const myGraph = new ThreeForceGraph()
+    .graphData(treeClusteringData)
+    .linkOpacity(1)
+    .numDimensions(2)
+
   myGraph.scale.multiplyScalar(scaleFactor)
   myGraph.position.setY(1)
   Engine.instance.currentWorld.scene.add(myGraph)
@@ -199,34 +227,57 @@ export default async function GraphSystem(world: World) {
 
   // forcegraph does stuff async internally with no callback......
   setTimeout(() => {
+
+    if (!getEngineState().joinedWorld.value)
+      matchActionOnce(EngineActions.joinedWorld.matches, () => {
+        updateCameraSettings()
+      })
+    else
+      updateCameraSettings()
+    // iterate the 
+    for (let i = 0; i < 60; i++) myGraph.tickFrame()
     myGraph.children.forEach((node: Mesh<any, any>) => {
       if (node.type === 'Mesh') {
         const nodeData = (node as any).__data
-        console.log(nodeData)
+        node.userData = {
+          ...node.userData,
+          ...nodeData
+        }
+        // node.position.z = node.position.y
+        // node.position.y = 0
+        // console.log(nodeData)
         if (nodeData.type === nodeTypes.person) node.material.visible = false
-        
+
         const imgPath = `https://${location.host}/projects/conjure/emerge/${nodeData.name}.jpg`
         AssetLoader.load(imgPath, ((texture) => {
           texture.encoding = sRGBEncoding
-          const mesh = new Mesh(new CircleGeometry(0.25, 16), new MeshBasicMaterial({ color: new Color('white'), map: texture, side: DoubleSide }))
-          mesh.scale.setScalar(invScaleFactor)
-          node.add(mesh)
+          const mesh = new Mesh(new CircleGeometry(0.125, 16), new MeshBasicMaterial({ color: new Color('white'), map: texture, side: DoubleSide }))
+          // mesh.scale.setScalar(invScaleFactor)
+          Engine.instance.currentWorld.scene.add(mesh)
+          node.getWorldPosition(mesh.position)
+
           node.userData.img = mesh
         }))
 
         if (nodeData.name) {
-          const ui = createSpreadsheetXRUI(nodeData.name, nodeData[spreadsheet.linkColumnId])
+          const ui = createSpreadsheetXRUI({ id: nodeData.name, link: nodeData[spreadsheet.linkColumnId], type: nodeData.type })
           xruis.push({ ui, node })
           ui.container.then(() => {
             const xrui = getComponent(ui.entity, XRUIComponent)
+            xrui.container.traverse((obj: Mesh<any, any>) => {
+              if (obj.material) obj.material.depthTest = false
+            })
             node.getWorldPosition(xrui.container.position)
-            xrui.container.position.y += 0.25
+            node.userData.type === 'person' && (xrui.container.position.y += 0.5)
           })
         }
       }
+      if (node.type === 'Line') {
+        // node.scale.z = node.scale.y
+      }
     })
-    // iterate the 
-    for (let i = 0; i < 60; i++) myGraph.tickFrame()
+    myGraph.rotateX(Math.PI / 2)
+    // myGraph.refresh()
   }, 100)
 
   const vec3 = new Vector3()
@@ -241,7 +292,6 @@ export default async function GraphSystem(world: World) {
   // })
 
   // const cardUI = createCardView()
-
   return () => {
     // const xrui = getComponent(cardUI.entity, XRUIComponent)
     // if (xrui) {
@@ -253,20 +303,19 @@ export default async function GraphSystem(world: World) {
 
       ui.node.getWorldPosition(vec3)
       const distanceToCamera = Engine.instance.currentWorld.camera.position.distanceTo(vec3)
-      const visible = distanceToCamera < 10
+      const visible = distanceToCamera < 8
       xrui.container.visible = visible
 
-      if(!visible) continue
+      const img = ui.node.userData.img
+      if (img) img.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
+
+      if (!visible) continue
 
       xrui.container.scale.setScalar(
-        Math.max(1, distanceToCamera / (3 * uiFalloffFactor))
+        Math.max(1, distanceToCamera / (3 * uiFalloffFactor)) * (ui.node.userData.type === 'person' ? 0.8 : 0.4)
       )
       xrui.container.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
 
-      const img = ui.node.userData.img 
-      if(img) {
-        img.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
-      }
     }
   }
 }
