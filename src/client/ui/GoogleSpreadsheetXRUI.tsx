@@ -41,7 +41,6 @@ type SpreadsheetNameState = ReturnType<typeof createNametagState>
 
 const GoogleSpreadsheetView = () => {
   const spreadsheetState = useXRUIState() as SpreadsheetNameState
-  console.log(spreadsheetState)
 
   return (
     <div
@@ -52,7 +51,7 @@ const GoogleSpreadsheetView = () => {
       {spreadsheetState.project.value && <p style={{ padding: '0px', fontSize: '20px' }}>
         {spreadsheetState.project.value}
         <br />
-        {spreadsheetState.links.value.split(',').map((link) => { return <>{link}</> })}
+        {spreadsheetState.links.value.split(',').map((link) => { return <><a style={{ color: '#00D8FF' }} href={link} target="_blank" rel="noopener noreferrer">{link}</a><br /></> })}
       </p>}
     </div>
   )
