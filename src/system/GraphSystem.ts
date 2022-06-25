@@ -125,16 +125,32 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
     })
   })
 
+  data.forEach((rowData, rowIndex) => {
+    treeNodes.push({
+      id: rowData.Name,
+      name: rowData.Name,
+      val: 1,
+      type: nodeTypes.person,
+      ...rowData
+    })
+  })
+
+  const toRemove = [] as any[]
+
+  treeNodes.forEach((node) => {
+    let hasLink = false
+    links.forEach((link) => {
+      if(link.source === node.id || link.target === node.id) hasLink = true
+    })
+    if(!hasLink) toRemove.push(node)
+  })
+
+  toRemove.forEach((node) =>{
+    treeNodes.splice(treeNodes.indexOf(node), 1)
+  })
+
   const treeClusteringData = {
-    nodes: data.map((rowData, rowIndex) => {
-      return {
-        id: rowData.Name,
-        name: rowData.Name,
-        val: 1,
-        type: nodeTypes.person as string,
-        ...rowData
-      }
-    }).concat(treeNodes),
+    nodes: treeNodes,
     links,
   }
 
