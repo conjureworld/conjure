@@ -1,6 +1,6 @@
 import { Engine } from '@xrengine/engine/src/ecs/classes/Engine'
 import { World } from '@xrengine/engine/src/ecs/classes/World'
-import { getComponent, hasComponent } from '@xrengine/engine/src/ecs/functions/ComponentFunctions'
+import { addComponent, getComponent, hasComponent } from '@xrengine/engine/src/ecs/functions/ComponentFunctions'
 import { matchActionOnce } from '@xrengine/engine/src/networking/functions/matchActionOnce'
 import { WorldNetworkAction } from '@xrengine/engine/src/networking/functions/WorldNetworkAction'
 import InfiniteGridHelper from '@xrengine/engine/src/scene/classes/InfiniteGridHelper'
@@ -29,6 +29,8 @@ import { matches } from '@xrengine/engine/src/common/functions/MatchesUtils'
 import { EngineActions, EngineState, getEngineState } from '@xrengine/engine/src/ecs/classes/EngineState'
 import { createObjectPool } from '@xrengine/engine/src/common/functions/ObjectPool'
 import json from './data.json'
+import { createWelcome } from '../client/ui/Welcome'
+import { PersistTagComponent } from '@xrengine/engine/src/scene/components/PersistTagComponent'
 
 type GraphData = {
   nodes: Array<{ id: string, name: string, val: number }>
@@ -318,7 +320,16 @@ export default async function GraphSystem(world: World) {
   //   })
   // })
 
-  // const cardUI = createCardView()
+  const welcomeCard = createWelcome()
+  addComponent(welcomeCard.entity, PersistTagComponent, {})
+  await welcomeCard.container.then(() => {
+    const xrui = getComponent(welcomeCard.entity, XRUIComponent)
+    ObjectFitFunctions.setUIVisible(xrui.container, true)
+    xrui.container.traverse((obj: Mesh<any, any>) => {
+      if (obj.material) obj.material.depthTest = false
+    })
+    xrui.container.position.set(0, 2, -2)
+  })
 
   if (!getEngineState().joinedWorld.value)
     matchActionOnce(EngineActions.joinedWorld.matches, () => {
@@ -334,7 +345,7 @@ export default async function GraphSystem(world: World) {
     //   ObjectFitFunctions.attachObjectToPreferredTransform(xrui.container)
     // }
     counter++
-    if (counter === 20) {
+    if (counter === 5) {
       counter = 0
       for (const node of nodes) {
         node.getWorldPosition(vec3)
@@ -343,7 +354,7 @@ export default async function GraphSystem(world: World) {
       }
       nodes.sort((a, b) => a.userData.distance - b.userData.distance)
       const removeList = [] as Mesh<any, any>[]
-      closestNodes = nodes.slice(0, 30)
+      closestNodes = nodes.slice(0, xruiObjectPool.size())
       // update 
       for (const node of displayedNodes) {
         if (!closestNodes.find((n) => n === node)) {
