@@ -13,7 +13,7 @@ import { Color, Vector3, Object3D, Mesh, CircleGeometry, MeshBasicMaterial, Mesh
 import ThreeForceGraph from 'three-forcegraph'
 import { createCardView } from '../client/ui/CardXRUI'
 import { createSpreadsheetView as createSpreadsheetXRUI } from '../client/ui/GoogleSpreadsheetXRUI'
-import { ObjectFitFunctions } from '@xrengine/engine/src/xrui/functions/ObjectFitFunctions'
+import { XRUIUtilFunctions } from '@xrengine/engine/src/xrui/functions/XRUIUtilFunctions'
 import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
 import { AssetLoader } from '@xrengine/engine/src/assets/classes/AssetLoader'
 import { API } from '@xrengine/client-core/src/API'
@@ -27,6 +27,8 @@ import { InputComponent } from '@xrengine/engine/src/input/components/InputCompo
 import { BaseInput } from '@xrengine/engine/src/input/enums/BaseInput'
 import { matches } from '@xrengine/engine/src/common/functions/MatchesUtils'
 import { EngineActions, EngineState, getEngineState } from '@xrengine/engine/src/ecs/classes/EngineState'
+import { createObjectPool } from '@xrengine/engine/src/common/functions/ObjectPool'
+import json from './data.json'
 
 type GraphData = {
   nodes: Array<{ id: string, name: string, val: number }>
@@ -46,7 +48,6 @@ const spreadsheets = {
     spreadsheetId: `1_fLq16ezrnOpYGynawDVWezrFuj2bomEfnssmqA03m8`,
     sheetId: 1336202753,
     filter: mapEmergeParticipants,
-    linkColumnId: 'Orgaisation/Project',
     treeClusterColumn: 'First area of interest',
     treeClusterColumnSecondary: 'Second area of interest'
   },
@@ -177,14 +178,18 @@ export default async function GraphSystem(world: World) {
    */
   const spreadsheet = spreadsheets[activeSpreadsheet]
 
-  const rawData = await API.instance.client.service('conjure-google-spreadsheet').get({
-    spreadsheetId: spreadsheet.spreadsheetId,
-    sheetId: spreadsheet.sheetId
-  })
+  // const rawData = await API.instance.client.service('conjure-google-spreadsheet').get({
+  //   spreadsheetId: spreadsheet.spreadsheetId,
+  //   sheetId: spreadsheet.sheetId
+  // })
 
-  const data = spreadsheet.filter(rawData) as GoogleSpreadsheetData
+  // console.log({rawData})
 
-  // console.log(data)
+  // const data = spreadsheet.filter(rawData) as GoogleSpreadsheetData
+
+  const data = json as any
+
+  console.log(data)
 
   const treeClusteringData = getTreeClusteringData(data)
   // console.log(treeClusteringData)
@@ -223,7 +228,24 @@ export default async function GraphSystem(world: World) {
   myGraph.position.setY(1)
   Engine.instance.currentWorld.scene.add(myGraph)
 
-  const xruis = [] as { ui: ReturnType<typeof createSpreadsheetXRUI>, node: Object3D }[]
+  const nodes = [] as Mesh<any, any>[]
+
+  const xruiObjectPool = createObjectPool(() => {
+    const ui = createSpreadsheetXRUI({ id: '', type: '' as any, project: '', links: '' })
+    ui.container.then(() => {
+      const xrui = getComponent(ui.entity, XRUIComponent)
+      xrui.container.traverse((obj: Mesh<any, any>) => {
+        if (obj.material) obj.material.depthTest = false
+      })
+    })
+    return ui
+  })
+  xruiObjectPool.grow(30)
+
+  let closestNodes = [] as Array<Mesh<any,any>>
+  let displayedNodes = [] as Array<Mesh<any,any>>
+  
+  // [] as { ui: ReturnType<typeof createSpreadsheetXRUI>, node: Object3D }[]
 
   // forcegraph does stuff async internally with no callback......
   setTimeout(() => {
@@ -238,6 +260,7 @@ export default async function GraphSystem(world: World) {
     for (let i = 0; i < 60; i++) myGraph.tickFrame()
     myGraph.children.forEach((node: Mesh<any, any>) => {
       if (node.type === 'Mesh') {
+        nodes.push(node)
         const nodeData = (node as any).__data
         node.userData = {
           ...node.userData,
@@ -260,16 +283,8 @@ export default async function GraphSystem(world: World) {
         }))
 
         if (nodeData.name) {
-          const ui = createSpreadsheetXRUI({ id: nodeData.name, link: nodeData[spreadsheet.linkColumnId], type: nodeData.type })
-          xruis.push({ ui, node })
-          ui.container.then(() => {
-            const xrui = getComponent(ui.entity, XRUIComponent)
-            xrui.container.traverse((obj: Mesh<any, any>) => {
-              if (obj.material) obj.material.depthTest = false
-            })
-            node.getWorldPosition(xrui.container.position)
-            node.userData.type === 'person' && (xrui.container.position.y += 0.5)
-          })
+          // const ui = createSpreadsheetXRUI({ id: nodeData.name, type: nodeData.type, project: nodeData.Project, links: nodeData.Links ?? '' })
+          // xruis.push({ ui, node })
         }
       }
       if (node.type === 'Line') {
@@ -292,30 +307,64 @@ export default async function GraphSystem(world: World) {
   // })
 
   // const cardUI = createCardView()
+
+  let counter = 0
   return () => {
     // const xrui = getComponent(cardUI.entity, XRUIComponent)
     // if (xrui) {
     //   ObjectFitFunctions.attachObjectToPreferredTransform(xrui.container)
     // }
-    for (const ui of xruis) {
-      const xrui = getComponent(ui.ui.entity, XRUIComponent)
-      if (!xrui) continue
+    counter++
+    if (counter === 10) {
+      counter = 0
+      const removeList = [] as Mesh<any, any>[]
+      for(const node of displayedNodes) {
+        if (!closestNodes.find((n) => n === node)) {
+          removeList.push(node)
+        }
+      }
+      for(const node of removeList) {
+        displayedNodes.splice(displayedNodes.indexOf(node), 1)
+        xruiObjectPool.recycle(node.userData.xrui)
+        delete node.userData.xrui
+      }
+      for (const node of nodes) {
+        node.getWorldPosition(vec3)
+        const distanceToCamera = Engine.instance.currentWorld.camera.position.distanceTo(vec3)
+        node.userData.distance = distanceToCamera
+      }
+      nodes.sort((a, b) => a.userData.distance - b.userData.distance)
+      closestNodes = nodes.slice(0, 30)
+      for (const node of closestNodes) {
+        if (!node.userData.xrui)  {
+          const xrui = xruiObjectPool.use()
+          node.userData.xrui = xrui
+          const nodeData = (node as any).__data
+          xrui.state.set({ id: nodeData.name, type: nodeData.type, project: nodeData.Project, links: nodeData.Links ?? '' })
+          displayedNodes.push(node)
+        }
+      }
+    }
 
-      ui.node.getWorldPosition(vec3)
-      const distanceToCamera = Engine.instance.currentWorld.camera.position.distanceTo(vec3)
+    for (const node of closestNodes) {
+      const distanceToCamera = node.userData.distance
       const visible = distanceToCamera < 8
-      xrui.container.visible = visible
 
-      const img = ui.node.userData.img
+      const img = node.userData.img
       if (img) img.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
 
       if (!visible) continue
 
+      const xrui = getComponent(node.userData.xrui.entity, XRUIComponent)
+      if (!xrui) continue
+
       xrui.container.scale.setScalar(
-        Math.max(1, distanceToCamera / (3 * uiFalloffFactor)) * (ui.node.userData.type === 'person' ? 0.8 : 0.4)
+        Math.max(1, distanceToCamera / (3 * uiFalloffFactor)) * (node.userData.type === 'person' ? 0.8 : 0.4)
       )
       xrui.container.rotation.setFromRotationMatrix(Engine.instance.currentWorld.camera.matrix)
 
+      node.getWorldPosition(xrui.container.position)
+      node.userData.type === 'person' && (xrui.container.position.y += 0.5)
     }
   }
 }

@@ -5,11 +5,11 @@ import { createXRUI } from '@xrengine/engine/src/xrui/functions/createXRUI'
 import { useXRUIState } from '@xrengine/engine/src/xrui/functions/useXRUIState'
 import { nodeTypes } from '../../system/GraphSystem'
 
-const randomColour = () => Math.floor(Math.random()*16777215).toString(16);
+const randomColour = () => Math.floor(Math.random() * 16777215).toString(16);
 
 const styles = {
   spreadsheetName: {
-    fontSize: '60px',
+    fontSize: '40px',
     backgroundColor: '#000000dd',
     color: 'white',
     fontFamily: "'Roboto', sans-serif",
@@ -18,14 +18,14 @@ const styles = {
     padding: '20px',
     margin: '60px',
     boxShadow: '#fff2 0 0 30px',
-    width: '400px',
     textAlign: 'center'
   }
 }
 
 type StateType = {
   id: string
-  link: string
+  links: string
+  project: string
   type: typeof nodeTypes[keyof typeof nodeTypes]
 }
 
@@ -41,25 +41,19 @@ type SpreadsheetNameState = ReturnType<typeof createNametagState>
 
 const GoogleSpreadsheetView = () => {
   const spreadsheetState = useXRUIState() as SpreadsheetNameState
-  const [hover, setHover] = React.useState<boolean>()
+  console.log(spreadsheetState)
 
-  const backgroundColour = () => {
-    switch(spreadsheetState.type.value) {
-      case 'subcategory': return randomColour()
-      case 'category': return randomColour()
-      case 'person': return 'black'
-      default: "black"
-    }
-  }
-
-  return <>
-    {/* <div style={styles.spreadsheetName as {}} onPointerEnter={() => setHover(true)} onPointerLeave={() => setHover(false)} > */}
+  return (
     <div
       xr-layer="true"
-      style={styles.spreadsheetName as {}} onPointerEnter={console.log} onPointerLeave={console.log}
+      style={{ ...styles.spreadsheetName as any }} onPointerEnter={console.log} onPointerLeave={console.log}
     >
       {spreadsheetState.id.value}
-      {hover && <p xr-layer="true" style={{ padding: '0px', backgroundColor: backgroundColour() }}>{spreadsheetState.link.value}</p>}
+      {spreadsheetState.project.value && <p style={{ padding: '0px', fontSize: '20px' }}>
+        {spreadsheetState.project.value}
+        <br />
+        {spreadsheetState.links.value.split(',').map((link) => { return <>{link}</> })}
+      </p>}
     </div>
-  </>
+  )
 }
