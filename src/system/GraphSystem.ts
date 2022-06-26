@@ -141,12 +141,12 @@ const getTreeClusteringData = (data: GoogleSpreadsheetData) => {
   treeNodes.forEach((node) => {
     let hasLink = false
     links.forEach((link) => {
-      if(link.source === node.id || link.target === node.id) hasLink = true
+      if (link.source === node.id || link.target === node.id) hasLink = true
     })
-    if(!hasLink) toRemove.push(node)
+    if (!hasLink) toRemove.push(node)
   })
 
-  toRemove.forEach((node) =>{
+  toRemove.forEach((node) => {
     treeNodes.splice(treeNodes.indexOf(node), 1)
   })
 
@@ -265,48 +265,43 @@ export default async function GraphSystem(world: World) {
   let closestNodes = [] as Array<Mesh<any, any>>
   let displayedNodes = [] as Array<Mesh<any, any>>
 
-  // [] as { ui: ReturnType<typeof createSpreadsheetXRUI>, node: Object3D }[]
+  await new Promise((resolve) => setTimeout(resolve, 100))
 
-  // forcegraph does stuff async internally with no callback......
-  setTimeout(() => {
-    // iterate the 
-    for (let i = 0; i < 60; i++) myGraph.tickFrame()
-    myGraph.children.forEach((node: Mesh<any, any>) => {
-      if (node.type === 'Mesh') {
-        nodes.push(node)
-        const nodeData = (node as any).__data
-        node.userData = {
-          ...node.userData,
-          ...nodeData
-        }
-        // node.position.z = node.position.y
-        // node.position.y = 0
-        // console.log(nodeData)
-        if (nodeData.type === nodeTypes.person) node.material.visible = false
-
-        const imgPath = `https://${location.host}/projects/conjure/emerge/${nodeData['First Name']} ${nodeData['Last Name']}.jpg`
-        AssetLoader.load(imgPath, ((texture) => {
-          texture.encoding = sRGBEncoding
-          const mesh = new Mesh(new CircleGeometry(0.125, 16), new MeshBasicMaterial({ color: new Color('white'), map: texture, side: DoubleSide }))
-          // mesh.scale.setScalar(invScaleFactor)
-          Engine.instance.currentWorld.scene.add(mesh)
-          node.getWorldPosition(mesh.position)
-
-          node.userData.img = mesh
-        }))
-
-        if (nodeData.name) {
-          // const ui = createSpreadsheetXRUI({ id: nodeData.name, type: nodeData.type, project: nodeData.Project, links: nodeData.Links ?? '' })
-          // xruis.push({ ui, node })
-        }
+  for (let i = 0; i < 60; i++) myGraph.tickFrame()
+  myGraph.children.forEach((node: Mesh<any, any>) => {
+    if (node.type === 'Mesh') {
+      nodes.push(node)
+      const nodeData = (node as any).__data
+      node.userData = {
+        ...node.userData,
+        ...nodeData
       }
-      if (node.type === 'Line') {
-        // node.scale.z = node.scale.y
+      // node.position.z = node.position.y
+      // node.position.y = 0
+      // console.log(nodeData)
+      if (nodeData.type === nodeTypes.person) node.material.visible = false
+
+      const imgPath = `https://${location.host}/projects/conjure/emerge/${nodeData['First Name']} ${nodeData['Last Name']}.jpg`
+      AssetLoader.load(imgPath, ((texture) => {
+        texture.encoding = sRGBEncoding
+        const mesh = new Mesh(new CircleGeometry(0.125, 16), new MeshBasicMaterial({ color: new Color('white'), map: texture, side: DoubleSide }))
+        // mesh.scale.setScalar(invScaleFactor)
+        Engine.instance.currentWorld.scene.add(mesh)
+        node.getWorldPosition(mesh.position)
+
+        node.userData.img = mesh
+      }))
+
+      if (nodeData.name) {
+        // const ui = createSpreadsheetXRUI({ id: nodeData.name, type: nodeData.type, project: nodeData.Project, links: nodeData.Links ?? '' })
+        // xruis.push({ ui, node })
       }
-    })
-    myGraph.rotateX(Math.PI / 2)
-    // myGraph.refresh()
-  }, 100)
+    }
+    if (node.type === 'Line') {
+      // node.scale.z = node.scale.y
+    }
+  })
+  myGraph.rotateX(Math.PI / 2)
 
   const vec3 = new Vector3()
   const uiFalloffFactor = 2
@@ -315,9 +310,11 @@ export default async function GraphSystem(world: World) {
     updateCameraSettings()
   })
 
+  // create welcome card
   const welcomeCard = createWelcome()
   addComponent(welcomeCard.entity, PersistTagComponent, {})
-  await (await welcomeCard.container).updateUntilReady()
+  // wait for welcome card to rasterize
+  await welcomeCard.container
   const welcomeXrui = getComponent(welcomeCard.entity, XRUIComponent)
   ObjectFitFunctions.setUIVisible(welcomeXrui.container, true)
   welcomeXrui.container.traverse((obj: Mesh<any, any>) => {
@@ -327,6 +324,18 @@ export default async function GraphSystem(world: World) {
   const manager = welcomeXrui.container.manager
   // await manager.importCache(`https://${location.host}/projects/conjure/emerge.graph.cache`)
 
+  // precache (after welcome card, so welcome card is front of queue)
+  // const preCacheUI = xruiObjectPool.objPool[0]
+  // for (const node of nodes) {
+  //   const nodeData = (node as any).__data
+  //   preCacheUI.state.set({ id: nodeData.name, type: nodeData.type, project: nodeData.Project, links: nodeData.Links ?? '' })
+  //   const xrui = getComponent(preCacheUI.entity, XRUIComponent)
+  //   manager.serialize((xrui.container.rootLayer as any)._webLayer).then((ret) => {
+  //     if (ret.needsRasterize) manager.rasterize(ret.stateKey as string, ret.svgUrl!)
+  //   })
+  // }
+
+  await welcomeXrui.container.updateUntilReady()
   let counter = 0
   const sortNodeUIs = () => {
     counter++
@@ -364,7 +373,7 @@ export default async function GraphSystem(world: World) {
           container.rootLayer
           container.userData.node = node
           container.updateUntilReady().then(() => {
-            if(node.userData.xrui === xrui)
+            if (node.userData.xrui === xrui)
               ObjectFitFunctions.setUIVisible(container, true)
           })
           displayedNodes.push(node)
@@ -373,7 +382,7 @@ export default async function GraphSystem(world: World) {
       manager.serializeQueue.sort((a, b) => {
         const aNode = manager.layersByElement.get(a.layer.element)?.userData.node
         const bNode = manager.layersByElement.get(b.layer.element)?.userData.node
-        if(!aNode || !bNode) return 0
+        if (!aNode || !bNode) return 0
         return aNode - bNode
       })
     }
