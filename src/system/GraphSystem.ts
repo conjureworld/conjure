@@ -11,7 +11,6 @@ import { XRUI } from '@xrengine/engine/src/xrui/functions/createXRUI'
 import { Color, Vector3, Object3D, Mesh, CircleGeometry, MeshBasicMaterial, MeshStandardMaterial, Texture, sRGBEncoding, DoubleSide } from 'three'
 
 import ThreeForceGraph from 'three-forcegraph'
-import { createCardView } from '../client/ui/CardXRUI'
 import { createSpreadsheetView as createSpreadsheetXRUI } from '../client/ui/GoogleSpreadsheetXRUI'
 import { ObjectFitFunctions } from '@xrengine/engine/src/xrui/functions/ObjectFitFunctions'
 import { GoogleSpreadsheetData } from '../common/GoogleSpreadsheetInterface'
@@ -178,12 +177,12 @@ const updateCameraSettings = () => {
     const followComponent = getComponent(world.localClientEntity, FollowCameraComponent)
     followComponent.distance = 0.01
     followComponent.maxPhi = 60
-    followComponent.minPhi = -30
+    followComponent.minPhi = -20
     followComponent.zoomLevel = 0.01
     // setTargetCameraRotation(world.localClientEntity, 0, followComponent.theta)
     switchCameraMode(world.localClientEntity, { cameraMode: CameraMode.FirstPerson }, true)
     getComponent(world.localClientEntity, InputComponent).schema.behaviorMap.delete(BaseInput.CAMERA_SCROLL)
-}, 500)
+  }, 500)
 }
 
 const activeSpreadsheet = 'emerge'
@@ -196,7 +195,7 @@ export default async function GraphSystem(world: World) {
   /**
    * Change this
    */
-  const spreadsheet = spreadsheets[activeSpreadsheet]
+  // const spreadsheet = spreadsheets[activeSpreadsheet]
 
   // const rawData = await API.instance.client.service('conjure-google-spreadsheet').get({
   //   spreadsheetId: spreadsheet.spreadsheetId,
@@ -209,7 +208,7 @@ export default async function GraphSystem(world: World) {
 
   const data = json as any
 
-  console.log(data)
+  // console.log(data)
 
   const treeClusteringData = getTreeClusteringData(data)
   // console.log(treeClusteringData)
@@ -260,7 +259,7 @@ export default async function GraphSystem(world: World) {
     })
     return ui
   })
-  xruiObjectPool.grow(30)
+  xruiObjectPool.grow(20)
   await Promise.all(xruiObjectPool.objPool.map((xrui) => xrui.container))
 
   let closestNodes = [] as Array<Mesh<any, any>>
@@ -312,40 +311,26 @@ export default async function GraphSystem(world: World) {
   const vec3 = new Vector3()
   const uiFalloffFactor = 2
 
-  // matchActionOnce(WorldNetworkAction.spawnAvatar.matches, (spawn) => {
-  //   const eid = world.getUserAvatarEntity(spawn.$from)
-  //   getComponent(eid, Object3DComponent).value.traverse((node: any) => {
-  //     if(node.material)
-  //       node.material.visible = false
-  //   })
-  // })
+  matchActionOnce(EngineActions.joinedWorld.matches, () => {
+    updateCameraSettings()
+  })
 
   const welcomeCard = createWelcome()
   addComponent(welcomeCard.entity, PersistTagComponent, {})
-  await welcomeCard.container.then(() => {
-    const xrui = getComponent(welcomeCard.entity, XRUIComponent)
-    ObjectFitFunctions.setUIVisible(xrui.container, true)
-    xrui.container.traverse((obj: Mesh<any, any>) => {
-      if (obj.material) obj.material.depthTest = false
-    })
-    xrui.container.position.set(0, 2, -2)
+  await (await welcomeCard.container).updateUntilReady()
+  const welcomeXrui = getComponent(welcomeCard.entity, XRUIComponent)
+  ObjectFitFunctions.setUIVisible(welcomeXrui.container, true)
+  welcomeXrui.container.traverse((obj: Mesh<any, any>) => {
+    if (obj.material) obj.material.depthTest = false
   })
-
-  if (!getEngineState().joinedWorld.value)
-    matchActionOnce(EngineActions.joinedWorld.matches, () => {
-      updateCameraSettings()
-    })
-  else
-    updateCameraSettings()
+  welcomeXrui.container.position.set(0, 2, -2)
+  const manager = welcomeXrui.container.manager
+  // await manager.importCache(`https://${location.host}/projects/conjure/emerge.graph.cache`)
 
   let counter = 0
-  return () => {
-    // const xrui = getComponent(cardUI.entity, XRUIComponent)
-    // if (xrui) {
-    //   ObjectFitFunctions.attachObjectToPreferredTransform(xrui.container)
-    // }
+  const sortNodeUIs = () => {
     counter++
-    if (counter === 5) {
+    if (counter === 10) {
       counter = 0
       for (const node of nodes) {
         node.getWorldPosition(vec3)
@@ -364,7 +349,10 @@ export default async function GraphSystem(world: World) {
       for (const node of removeList) {
         displayedNodes.splice(displayedNodes.indexOf(node), 1)
         xruiObjectPool.recycle(node.userData.xrui)
-        delete node.userData.xrui
+        const { container } = getComponent(node.userData.xrui.entity, XRUIComponent)
+        ObjectFitFunctions.setUIVisible(container, false)
+        container.userData.node = undefined
+        node.userData.xrui = undefined
       }
       for (const node of closestNodes) {
         if (!node.userData.xrui) {
@@ -372,11 +360,27 @@ export default async function GraphSystem(world: World) {
           node.userData.xrui = xrui
           const nodeData = (node as any).__data
           xrui.state.set({ id: nodeData.name, type: nodeData.type, project: nodeData.Project, links: nodeData.Links ?? '' })
+          const { container } = getComponent(xrui.entity, XRUIComponent)
+          container.rootLayer
+          container.userData.node = node
+          container.updateUntilReady().then(() => {
+            if(node.userData.xrui === xrui)
+              ObjectFitFunctions.setUIVisible(container, true)
+          })
           displayedNodes.push(node)
         }
       }
+      manager.serializeQueue.sort((a, b) => {
+        const aNode = manager.layersByElement.get(a.layer.element)?.userData.node
+        const bNode = manager.layersByElement.get(b.layer.element)?.userData.node
+        if(!aNode || !bNode) return 0
+        return aNode - bNode
+      })
     }
+  }
 
+  return () => {
+    sortNodeUIs()
     for (const node of closestNodes) {
       const distanceToCamera = node.userData.distance
       const visible = distanceToCamera < 8

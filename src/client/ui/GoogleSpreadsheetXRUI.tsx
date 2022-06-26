@@ -45,7 +45,8 @@ const GoogleSpreadsheetView = () => {
   return (
     <div
       xr-layer="true"
-      style={{ ...styles.spreadsheetName as any }} onPointerEnter={console.log} onPointerLeave={console.log}
+      xr-pixel-ratio="0.3"
+      style={{ ...styles.spreadsheetName as any }}
     >
       {spreadsheetState.id.value}
       {spreadsheetState.project.value && <p style={{ padding: '0px', fontSize: '20px' }}>

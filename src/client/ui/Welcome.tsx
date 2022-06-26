@@ -31,7 +31,7 @@ const Welcome = () => {
   return (
     <>
       <style>{styles}</style>
-      <div className={'welcomeContainer'} xr-layer="true">
+      <div className={'welcomeContainer'} xr-layer="true" xr-pixel-ratio="0.5">
         <p>
           <b>Welcome</b> to <a target="_blank" rel="noopener noreferrer" style={{ color: '#00D8FF' }} href="https://docs.google.com/document/d/169FlpUoy7xM6ljqcN_O2OHODsr7l0g3n-Z1Aw990udU">Conjure</a>.
           This is an early version of the future of the immersive web, one which will enable real-time embodied collaborative programming and digital tool making. Conjure is built on <a target="_blank" rel="noopener noreferrer" style={{ color: '#00D8FF' }} href="https://etherealengine.org/">Ethereal Engine</a>, a free and open source web-first metaverse / spatial web engine.
