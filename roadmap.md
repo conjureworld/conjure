@@ -21,5 +21,3 @@ A technology for agent centric exponential sensemaking, meaningmaking & choicema
 - [ ] Web 2.0 => Web 3.0 migration tools
 
 
-### Conjure Tools
-
