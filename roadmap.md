@@ -1,32 +1,25 @@
-# Conjure Realtime Collaborative Coding 
+# Conjure - Realtime Collaborative Coding & Visualisation
 
+A technology for agent centric exponential sensemaking, meaningmaking & choicemaking.
 
-## Alpha Roadmap
-
-### XREngine Core
-
-- [ ] ESM HTTPs - Project API 2.0
-- [ ] Immersive networked editor
-- [ ] Monaco in editor & vscode bridge
-- [ ] P2P networking mode
-
-### XREngine Modules
-
-- [ ] 
-
-### Conjure Core
-
+## Conjure MVP - Q3
+- [ ] Realtime ESM HTTPs & Import Maps
 - [ ] Project/tool DID registry
-- [ ] hApp prototype
-- [ ] Holochain network transport
-- [ ] Perspect3vsm feathersjs adapter
-- [ ] Tool connecting UI
 
-### Conjure Widgets
+## Conjure 0.1 - Q4
+- [ ] P2P network configuration 
+- [ ] hApp prototype (via wasm & iframe)
+- [ ] Immersive networked editor
+- [ ] Immersive programming tools
+- [ ] Visual Script Node UI
+- [ ] Monaco & Vscode Bridge
+- [ ] Object Hook / Scripting API
 
-- [ ] implement Matrix in conjure
-- [ ] implement Signal in conjure
-- [ ] clutter (holochain twitter)
+## Conjure 0.2 - 2023
+- [ ] Perspect3vsm feathersjs adapter & QUIC transport via holochain
+- [ ] Matrix & Signal
+- [ ] Web 2.0 => Web 3.0 migration tools
+
 
 ### Conjure Tools
 
